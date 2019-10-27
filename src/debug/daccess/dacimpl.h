@@ -1506,7 +1506,7 @@ extern ClrDataAccess* g_dacImpl;
  * this to the user.  Unfortunately this will have to be fixed in the next iteration
  * when we add more robust error handling to SOS's interface.
  */
- template <class T>
+ template <class T, REFIID IID_T>
 class DefaultCOMImpl : public T
 {
 public:
@@ -1541,7 +1541,7 @@ public:
             *ppObj = static_cast<IUnknown*>(this);
             return S_OK;
         }
-        else if (IsEqualIID(riid, __uuidof(T)))
+        else if (IsEqualIID(riid, IID_T))
         {
             AddRef();
             *ppObj = static_cast<T*>(this);
@@ -1820,7 +1820,7 @@ struct SOSStackErrorList
 };
 
 class DacStackReferenceWalker;
-class DacStackReferenceErrorEnum : public DefaultCOMImpl<ISOSStackRefErrorEnum>
+class DacStackReferenceErrorEnum : public DefaultCOMImpl<ISOSStackRefErrorEnum, IID_ISOSStackRefErrorEnum>
 {
 public:
     DacStackReferenceErrorEnum(DacStackReferenceWalker *pEnum, SOSStackErrorList *pErrors);
@@ -1843,7 +1843,7 @@ private:
 
  /* DacStackReferenceWalker.
  */
-class DacStackReferenceWalker : public DefaultCOMImpl<ISOSStackRefEnum>
+class DacStackReferenceWalker : public DefaultCOMImpl<ISOSStackRefEnum, IID_ISOSStackRefEnum>
 {
     struct DacScanContext : public ScanContext
     {
@@ -2074,7 +2074,7 @@ private:
 
 
 struct DacGcReference;
-class DacHandleWalker : public DefaultCOMImpl<ISOSHandleEnum>
+class DacHandleWalker : public DefaultCOMImpl<ISOSHandleEnum, IID_ISOSHandleEnum>
 {
     typedef struct _HandleChunkHead
     {

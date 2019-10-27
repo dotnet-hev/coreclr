@@ -4694,7 +4694,7 @@ void Thread::SetBackground(BOOL isBack, BOOL bRequiresTSL)
 }
 
 #ifdef FEATURE_COMINTEROP
-class ApartmentSpyImpl : public IUnknownCommon<IInitializeSpy>
+class ApartmentSpyImpl : public IUnknownCommon<IInitializeSpy, IID_IInitializeSpy>
 {
 
 public:
