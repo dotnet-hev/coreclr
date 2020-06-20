@@ -20,7 +20,7 @@
 
     <!-- Define packaging attributes for cross target components -->
     <HasCrossTargetComponents Condition="'$(TargetsWindows)' == 'true' and ('$(PackagePlatform)' =='arm64' or '$(PackagePlatform)' =='arm')">true</HasCrossTargetComponents>
-    <HasCrossTargetComponents Condition="'$(TargetsLinux)' == 'true' and ('$(PackagePlatform)' =='arm64' or '$(PackagePlatform)' =='arm') and '$(__DoCrossArchBuild)' == '1'">true</HasCrossTargetComponents>
+    <HasCrossTargetComponents Condition="'$(TargetsLinux)' == 'true' and ('$(PackagePlatform)' =='arm64' or '$(PackagePlatform)' =='arm' or '$(PackagePlatform)' =='mips64') and '$(__DoCrossArchBuild)' == '1'">true</HasCrossTargetComponents>
 
     <!-- Created package output locations must be kept in sync with eng/build-job.yml -->
     <PackageOutputPath>$(PackagesBinDir)/pkg/</PackageOutputPath>

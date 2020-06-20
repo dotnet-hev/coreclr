@@ -152,6 +152,9 @@
     <OfficialBuildRID Include="linux-arm64">
       <Platform>arm64</Platform>
     </OfficialBuildRID>
+    <OfficialBuildRID Include="linux-mips64">
+      <Platform>mips64</Platform>
+    </OfficialBuildRID>
     <OfficialBuildRID Include="linux-musl-arm64">
       <Platform>arm64</Platform>
     </OfficialBuildRID>

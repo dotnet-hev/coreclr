@@ -101,6 +101,9 @@ inline void SwapGuid(GUID *pGuid)
 #ifdef _ARM_
 #define LOG2_PTRSIZE	2
 #define ALIGN_ACCESS    ((1<<LOG2_PTRSIZE)-1)
+#elif _MIPS64_
+#define ALIGN_ACCESS    4
+#undef memcpy
 #endif
 
 #if defined(ALIGN_ACCESS) && !defined(_MSC_VER)

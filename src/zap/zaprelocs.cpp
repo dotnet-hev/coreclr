@@ -156,6 +156,20 @@ void ZapBaseRelocs::WriteReloc(PVOID pSrc, int offset, ZapNode * pTarget, int ta
         return;
 #endif
 
+#if defined(_TARGET_MIPS64_)
+    case IMAGE_REL_MIPS64_PC:
+        {
+            INT64 relAddr = (INT64)pTarget->GetRVA() - (INT64)m_pImage->GetCurrentRVA();
+
+            assert(relAddr < 0x7fffffff);
+            assert(-((int64_t)1<<31) < relAddr);
+
+            *(short*)pLocation = (short)(relAddr>>16);
+            *(short*)(pLocation + 4) = (short)relAddr;
+        }
+        return;
+#endif
+
     default:
         _ASSERTE(!"Unknown relocation type");
         break;
@@ -322,6 +336,11 @@ void ZapBlobWithRelocs::Save(ZapWriter * pZapWriter)
 
 #endif // defined(_TARGET_ARM64_)
 
+#if defined(_TARGET_MIPS64_)
+            case IMAGE_REL_MIPS64_PC:
+                //targetOffset =  0;
+                break;
+#endif
             default:
                 _ASSERTE(!"Unknown reloc type");
                 break;

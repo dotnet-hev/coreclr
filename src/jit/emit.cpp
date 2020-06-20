@@ -849,8 +849,11 @@ insGroup* emitter::emitSavIG(bool emitAdd)
         ig->igFlags |= IGF_BYREF_REGS;
 
         /* We'll allocate extra space (DWORD aligned) to record the GC regs */
-
+#if defined(_TARGET_MIPS64_)
+        gs += sizeof(regMaskTP);
+#else
         gs += sizeof(int);
+#endif
     }
 
     /* Allocate space for the instructions and optional liveset */
@@ -863,10 +866,18 @@ insGroup* emitter::emitSavIG(bool emitAdd)
     {
         /* Record the byref regs in front the of the instructions */
 
+#if defined(_TARGET_MIPS64_)
+        *castto(id, regMaskTP*)++ = emitInitByrefRegs;
+#else
         *castto(id, unsigned*)++ = (unsigned)emitInitByrefRegs;
+#endif
     }
 
     /* Do we need to store the liveset? */
+
+#if defined(_TARGET_MIPS64_) && defined(DEBUG) && defined(UNALIGNED_CHECK_DISABLE)
+    UNALIGNED_CHECK_DISABLE;
+#endif
 
     if (ig->igFlags & IGF_GC_VARS)
     {
@@ -895,10 +906,18 @@ insGroup* emitter::emitSavIG(bool emitAdd)
 
     /* Record how many instructions and bytes of code this group contains */
 
+#ifdef _TARGET_MIPS64_
+    noway_assert((unsigned int)emitCurIGinsCnt == emitCurIGinsCnt);
+#else
     noway_assert((BYTE)emitCurIGinsCnt == emitCurIGinsCnt);
+#endif
     noway_assert((unsigned short)emitCurIGsize == emitCurIGsize);
 
+#ifdef _TARGET_MIPS64_
+    ig->igInsCnt = (unsigned int)emitCurIGinsCnt;
+#else
     ig->igInsCnt = (BYTE)emitCurIGinsCnt;
+#endif
     ig->igSize   = (unsigned short)emitCurIGsize;
     emitCurCodeOffset += emitCurIGsize;
     assert(IsCodeAligned(emitCurCodeOffset));
@@ -997,7 +1016,7 @@ insGroup* emitter::emitSavIG(bool emitAdd)
 
             /* Make sure the jumps are correctly ordered */
 
-            assert(last == nullptr || last->idjOffs > nj->idjOffs);
+            assert(last == nullptr || last->idjOffs >= nj->idjOffs);
 
             if (ig->igFlags & IGF_FUNCLET_PROLOG)
             {
@@ -1042,6 +1061,10 @@ insGroup* emitter::emitSavIG(bool emitAdd)
                 emitJumpLast = last;
             }
         }
+
+#if defined(_TARGET_MIPS64_) && defined(DEBUG) && defined(UNALIGNED_CHECK_ENABLE)
+        UNALIGNED_CHECK_ENABLE;
+#endif
     }
 
     /* Fix the last instruction field */
@@ -1151,6 +1174,10 @@ void emitter::emitBegFN(bool hasFramePtr
     emitFirstColdIG   = nullptr;
     emitTotalCodeSize = 0;
 
+#ifdef _TARGET_MIPS64_
+    emitCounts_INS_OPTS_J = 0;
+#endif
+
 #if EMITTER_STATS
     emitTotalIGmcnt++;
     emitSizeMethod      = 0;
@@ -1187,6 +1214,11 @@ void emitter::emitBegFN(bool hasFramePtr
     emitLastIns = nullptr;
 
     ig->igNext = nullptr;
+
+//#ifdef _TARGET_MIPS64_
+// On future maybe use this.
+//    ig->igJmpCnt = 0;
+//#endif
 
 #ifdef DEBUG
     emitScratchSigInfo = nullptr;
@@ -1226,6 +1258,7 @@ int emitter::instrDesc::idAddrUnion::iiaGetJitDataOffset() const
     return Compiler::eeGetJitDataOffs(iiaFieldHnd);
 }
 
+#if !defined(_TARGET_MIPS64_)
 void emitter::dispIns(instrDesc* id)
 {
 #ifdef DEBUG
@@ -1247,6 +1280,12 @@ void emitter::dispIns(instrDesc* id)
     emitIFcounts[id->idInsFmt()]++;
 #endif
 }
+#else
+void emitter::dispIns(instrDesc* id)
+{
+    assert(!"unimplemented yet on MIPS");
+}
+#endif // !defined(_TARGET_MIPS64_)
 
 void emitter::appendToCurIG(instrDesc* id)
 {
@@ -2207,6 +2246,11 @@ void emitter::emitSetFrameRangeGCRs(int offsLo, int offsHi)
 #ifdef _TARGET_AMD64_
             // doesn't have to be all negative on amd
             printf("-%04X ... %04X\n", -offsLo, offsHi);
+#elif defined(_TARGET_MIPS64_)
+            if (offsHi < 0)
+                printf("-%04X ... -%04X\n", -offsLo, -offsHi);
+            else
+                printf("-%04X ... %04X\n", -offsLo, offsHi);
 #else
             printf("-%04X ... -%04X\n", -offsLo, -offsHi);
             assert(offsHi <= 0);
@@ -2483,7 +2527,7 @@ void* emitter::emitAddLabel(VARSET_VALARG_TP GCvars, regMaskTP gcrefRegs, regMas
     return emitCurIG;
 }
 
-#ifdef _TARGET_ARMARCH_
+#if defined(_TARGET_ARMARCH_) || defined(_TARGET_MIPS64_)
 
 // Does the argument location point to an IG at the end of a function or funclet?
 // We can ignore the codePos part of the location, since it doesn't affect the
@@ -2830,7 +2874,9 @@ void emitter::emitGenerateUnwindNop(instrDesc* id, void* context)
     comp->unwindNop(id->idCodeSize());
 #elif defined(_TARGET_ARM64_)
     comp->unwindNop();
-#endif // defined(_TARGET_ARM64_)
+#elif defined(_TARGET_MIPS64_)
+    comp->unwindNop();
+#endif // defined(_TARGET_MIPS64_)
 }
 
 /*****************************************************************************
@@ -2843,8 +2889,7 @@ void emitter::emitUnwindNopPadding(emitLocation* locFrom, Compiler* comp)
 {
     emitWalkIDs(locFrom, emitGenerateUnwindNop, comp);
 }
-
-#endif // _TARGET_ARMARCH_
+#endif // defined_TARGET_ARMARCH_) || defined(_TARGET_MIPS64_)
 
 #if defined(_TARGET_ARM_)
 
@@ -3200,6 +3245,7 @@ const char* emitter::emitFncName(CORINFO_METHOD_HANDLE methHnd)
  *  don't have some of the tail fields of instrDesc (in particular, "idInfo").
  */
 
+/* FIXME for MIPS: not needed for mips */
 const BYTE emitter::emitFmtToOps[] = {
 #define IF_DEF(en, op1, op2) ID_OP_##op2,
 #include "emitfmts.h"
@@ -3394,7 +3440,7 @@ void emitter::emitDispIG(insGroup* ig, insGroup* igPrev, bool verbose)
             unsigned       cnt = ig->igInsCnt;
 
             if (cnt)
-            {
+            {//all these should re-design for mips64.
                 printf("\n");
 
                 do
@@ -3605,6 +3651,18 @@ void emitter::emitJumpDistBind()
 
     int jmp_iteration = 1;
 
+#ifdef _TARGET_MIPS64_
+    //NOTE:
+    //  bit0 of isLinkingEnd_mips: indicating whether updating the instrDescJmp's size with the type INS_OPTS_J;
+    //  bit1 of isLinkingEnd_mips: indicating not needed updating ths size while emitTotalCodeSize <= (0x7fff << 2) or had updated;
+    unsigned int isLinkingEnd_mips = emitTotalCodeSize <= (0x7fff << 2) ? 2 : 0;
+
+    UNATIVE_OFFSET ssz = 4; // relative small jump's delay-slot.
+    // small  jump max. neg distance
+    NATIVE_OFFSET  nsd = B_DIST_SMALL_MAX_NEG;
+    // small  jump max. pos distance
+    NATIVE_OFFSET  psd = B_DIST_SMALL_MAX_POS - emitCounts_INS_OPTS_J * (3 << 2);//the placeholder sizeof(INS_OPTS_JR) - sizeof(INS_OPTS_J).
+#endif
 /*****************************************************************************/
 /* If we iterate to look for more jumps to shorten, we start again here.     */
 /*****************************************************************************/
@@ -3641,9 +3699,11 @@ AGAIN:
 
         UNATIVE_OFFSET jsz; // size of the jump instruction in bytes
 
+#ifndef _TARGET_MIPS64_
         UNATIVE_OFFSET ssz = 0; // small  jump size
         NATIVE_OFFSET  nsd = 0; // small  jump max. neg distance
         NATIVE_OFFSET  psd = 0; // small  jump max. pos distance
+#endif
 
 #if defined(_TARGET_ARM_)
         UNATIVE_OFFSET msz = 0; // medium jump size
@@ -3759,10 +3819,21 @@ AGAIN:
         }
 #endif // _TARGET_ARM64_
 
+#ifdef _TARGET_MIPS64_
+        psd += (jmp->idInsOpt() == INS_OPTS_J ? (3 << 2) : 0);
+#endif // _TARGET_MIPS64_
+
 /* Make sure the jumps are properly ordered */
 
 #ifdef DEBUG
+#if defined(_TARGET_MIPS64_)
+#if defined(UNALIGNED_CHECK_DISABLE)
+	UNALIGNED_CHECK_DISABLE;
+#endif
+        assert(lastLJ == nullptr || lastIG != jmp->idjIG || lastLJ->idjOffs < (jmp->idjOffs + adjLJ));
+#else
         assert(lastLJ == nullptr || lastIG != jmp->idjIG || lastLJ->idjOffs < jmp->idjOffs);
+#endif
         lastLJ = (lastIG == jmp->idjIG) ? jmp : nullptr;
 
         assert(lastIG == nullptr || lastIG->igNum <= jmp->idjIG->igNum || jmp->idjIG == prologIG ||
@@ -3796,10 +3867,19 @@ AGAIN:
                     if (EMITVERBOSE)
                     {
                         printf("Adjusted offset of " FMT_BB " from %04X to %04X\n", lstIG->igNum, lstIG->igOffs,
-                               lstIG->igOffs - adjIG);
+#if defined(_TARGET_MIPS64_)
+                               lstIG->igOffs + adjIG
+#else
+                               lstIG->igOffs - adjIG
+#endif
+                               );
                     }
 #endif // DEBUG
+#if defined(_TARGET_MIPS64_)
+                    lstIG->igOffs += adjIG;
+#else
                     lstIG->igOffs -= adjIG;
+#endif
                     assert(IsCodeAligned(lstIG->igOffs));
                 } while (lstIG != jmpIG);
             }
@@ -3812,7 +3892,11 @@ AGAIN:
 
         /* Apply any local size adjustment to the jump's relative offset */
 
+#if defined(_TARGET_MIPS64_)
+        jmp->idjOffs += adjLJ;
+#else
         jmp->idjOffs -= adjLJ;
+#endif
 
         // If this is a jump via register, the instruction size does not change, so we are done.
         CLANG_FORMAT_COMMENT_ANCHOR;
@@ -3860,8 +3944,9 @@ AGAIN:
 
             if (jmp->idjShort)
             {
+#ifndef _TARGET_MIPS64_
                 assert(jmp->idCodeSize() == ssz);
-
+#endif
                 // We should not be jumping/branching across funclets/functions
                 emitCheckFuncletBranch(jmp, jmpIG);
 
@@ -3972,7 +4057,11 @@ AGAIN:
                here and the target could be shortened, causing the actual distance to shrink.
              */
 
+#if defined(_TARGET_MIPS64_)
+            dstOffs += adjIG;
+#else
             dstOffs -= adjIG;
+#endif
 
             /* Compute the distance estimate */
 
@@ -4007,11 +4096,34 @@ AGAIN:
             }
 #endif // DEBUG_EMIT
 
+#if defined(_TARGET_MIPS64_)
+            assert(jmpDist >= 0);//Forward jump
+            assert(!(jmpDist & 0x3));
+
+            if (isLinkingEnd_mips & 0x2)
+            {
+                jmp->idAddr()->iiaSetJmpOffset(jmpDist);
+            }
+            else if ((extra > 0) && (jmp->idInsOpt() == INS_OPTS_J))
+            {
+                jmp->idInsOpt(INS_OPTS_JR);
+                jmp->idCodeSize(20);
+                jmpIG->igSize += (3 << 2);//the placeholder sizeof(INS_OPTS_JR) - sizeof(INS_OPTS_J).
+                adjLJ += (3 << 2);
+                adjIG += (3 << 2);
+                emitTotalCodeSize += (3 << 2);
+                jmpIG->igFlags |= IGF_UPD_ISZ;
+                isLinkingEnd_mips |= 0x1;
+            }
+            continue;
+
+#else // not defined(_TARGET_MIPS64_)
             if (extra <= 0)
             {
                 /* This jump will be a short one */
                 goto SHORT_JMP;
             }
+#endif
         }
         else
         {
@@ -4050,13 +4162,43 @@ AGAIN:
             }
 #endif // DEBUG_EMIT
 
+#if defined(_TARGET_MIPS64_)
+            assert(jmpDist >= 0);//Backward jump
+            assert(!(jmpDist & 0x3));
+
+            if (isLinkingEnd_mips & 0x2)
+            {
+                jmp->idAddr()->iiaSetJmpOffset(-jmpDist);//Backward jump is negative!
+            }
+            else if ((extra > 0) && (jmp->idInsOpt() == INS_OPTS_J))
+            {
+                jmp->idInsOpt(INS_OPTS_JR);
+                jmp->idCodeSize(20);
+                jmpIG->igSize += (3 << 2);//the placeholder sizeof(INS_OPTS_JR) - sizeof(INS_OPTS_J).
+                adjLJ += (3 << 2);
+                adjIG += (3 << 2);
+                emitTotalCodeSize += (3 << 2);
+                jmpIG->igFlags |= IGF_UPD_ISZ;
+                isLinkingEnd_mips |= 0x1;
+            }
+            continue;
+
+#else // not defined(_TARGET_MIPS64_)
             if (extra <= 0)
             {
                 /* This jump will be a short one */
                 goto SHORT_JMP;
             }
+#endif
         }
 
+#if defined(_TARGET_MIPS64_)
+#if defined(DEBUG) && defined(UNALIGNED_CHECK_ENABLE)
+	UNALIGNED_CHECK_ENABLE;
+#endif
+#endif
+
+#ifndef _TARGET_MIPS64_
         /* We arrive here if the jump couldn't be made short, at least for now */
 
         /* We had better not have eagerly marked the jump as short
@@ -4188,6 +4330,8 @@ AGAIN:
         // The size of IF_LARGEJMP/IF_LARGEADR/IF_LARGELDC are 8 or 12.
         // All other code size is 4.
         assert((sizeDif == 4) || (sizeDif == 8));
+#elif defined(_TARGET_MIPS64_)
+        assert(sizeDif == 0);
 #else
 #error Unsupported or unset target architecture
 #endif
@@ -4228,7 +4372,6 @@ AGAIN:
     NEXT_JMP:
 
         /* Make sure the size of the jump is marked correctly */
-
         assert((0 == (jsz | jmpDist)) || (jsz == jmp->idCodeSize()));
 
 #ifdef DEBUG
@@ -4242,14 +4385,49 @@ AGAIN:
         adjIG += sizeDif;
         adjLJ += sizeDif;
         jmpIG->igSize -= (unsigned short)sizeDif;
+//#if defined(_TARGET_MIPS64_)
+//        assert(sizeDif == 0);
+//#endif
         emitTotalCodeSize -= sizeDif;
 
         /* The jump size estimate wasn't accurate; flag its group */
 
         jmpIG->igFlags |= IGF_UPD_ISZ;
 
+#endif  // not defined(_TARGET_MIPS64_)
     } // end for each jump
 
+#if defined(_TARGET_MIPS64_)
+    if ((isLinkingEnd_mips & 0x3) < 0x2)
+    {
+        //indicating had updated the instrDescJmp's size with the type INS_OPTS_J.
+        isLinkingEnd_mips = 0x2;
+        //emitRecomputeIGoffsets();
+        /* Adjust offsets of any remaining blocks */
+
+        for (;lstIG;)
+        {
+            lstIG = lstIG->igNext;
+            if (!lstIG)
+            {
+                break;
+            }
+#ifdef DEBUG
+            if (EMITVERBOSE)
+            {
+                printf("Adjusted offset of " FMT_BB " from %04X to %04X\n", lstIG->igNum, lstIG->igOffs,
+                       lstIG->igOffs + adjIG);
+            }
+#endif // DEBUG
+
+            lstIG->igOffs += adjIG;
+
+            assert(IsCodeAligned(lstIG->igOffs));
+        }
+        goto AGAIN;
+    }
+
+#else
     /* Did we shorten any jumps? */
 
     if (adjIG)
@@ -4313,6 +4491,8 @@ AGAIN:
             goto AGAIN;
         }
     }
+#endif
+
 #ifdef DEBUG
     if (EMIT_INSTLIST_VERBOSE)
     {
@@ -4327,6 +4507,12 @@ AGAIN:
 void emitter::emitCheckFuncletBranch(instrDesc* jmp, insGroup* jmpIG)
 {
 #ifdef DEBUG
+
+#ifdef _TARGET_MIPS64_
+    /* FIXME for MIPS: not support idDebugOnlyInfo.*/
+    return;
+#endif
+
     // We should not be jumping/branching across funclets/functions
     // Except possibly a 'call' to a finally funclet for a local unwind
     // or a 'return' from a catch handler (that can go just about anywhere)
@@ -4622,7 +4808,7 @@ unsigned emitter::emitEndCodeGen(Compiler* comp,
 #endif
 
     if (emitConsDsc.align16)
-    {
+    {//should confirm.
         allocMemFlag = static_cast<CorJitAllocMemFlag>(allocMemFlag | CORJIT_ALLOCMEM_FLG_RODATA_16BYTE_ALIGN);
     }
 
@@ -4646,6 +4832,47 @@ unsigned emitter::emitEndCodeGen(Compiler* comp,
                             xcptnsCount, allocMemFlag, (void**)&codeBlock, (void**)&coldCodeBlock, (void**)&consBlock);
 
     consBlock = codeBlock + emitTotalHotCodeSize + roDataAlignmentDelta;
+
+#elif defined(_TARGET_MIPS64_)
+    // For MIPS64, we want to allocate JIT data always adjacent to code similar to what native compiler does.
+    // This way allows us to use a single `ld` to access such data like float constant/jmp table.
+    if (emitTotalColdCodeSize > 0)
+    {
+        // JIT data might be far away from the cold code.
+        NYI_MIPS64("Need to handle fix-up to data from cold code.");
+    }
+
+    UNATIVE_OFFSET roDataAlignmentDelta = 0;
+    if (emitConsDsc.dsdOffs)
+    {
+        UNATIVE_OFFSET roDataAlignment = TARGET_POINTER_SIZE; // 8 Byte align by default.
+        roDataAlignmentDelta = (UNATIVE_OFFSET)ALIGN_UP(emitTotalHotCodeSize, roDataAlignment) - emitTotalHotCodeSize;
+        assert((roDataAlignmentDelta == 0) || (roDataAlignmentDelta == 4));
+    }
+
+    emitCmpHandle->allocMem(emitTotalHotCodeSize + roDataAlignmentDelta + emitConsDsc.dsdOffs, emitTotalColdCodeSize, 0,
+                            xcptnsCount, allocMemFlag, (void**)&codeBlock, (void**)&coldCodeBlock, (void**)&consBlock);
+
+    consBlock = codeBlock + emitTotalHotCodeSize + roDataAlignmentDelta;
+
+#ifdef DEBUG
+    bool DspIns = false;
+    /* Print the IG label, but only if it is a branch label */
+    if (emitComp->opts.disAsm || emitComp->opts.dspEmit || emitComp->verbose)
+    {
+        //if (emitComp->verbose)
+        //{
+        //    DspIns = true;
+        //    //printf("\n");
+        //    //emitDispIG(ig); // Display the flags, IG data, etc.
+        //}
+        DspIns = true;
+        //else
+        //{
+        //    printf("\nG_M%03u_IG%02u:\n", Compiler::s_compMethodsCount, ig->igNum);
+        //}
+    }
+#endif // DEBUG
 
 #else
     emitCmpHandle->allocMem(emitTotalHotCodeSize, emitTotalColdCodeSize, emitConsDsc.dsdOffs, xcptnsCount, allocMemFlag,
@@ -5030,6 +5257,11 @@ unsigned emitter::emitEndCodeGen(Compiler* comp,
         ig->igSize = (unsigned short)(cp - bp);
     }
 
+#ifdef _TARGET_MIPS64_
+    //cp = cp - 4;
+    unsigned actualCodeSize = cp - codeBlock;
+#endif
+
 #if EMIT_TRACK_STACK_DEPTH
     assert(emitCurStackLvl == 0);
 #endif
@@ -5134,6 +5366,10 @@ unsigned emitter::emitEndCodeGen(Compiler* comp,
 #elif defined(_TARGET_ARM64_)
                     assert(!jmp->idAddr()->iiaHasInstrCount());
                     emitOutputLJ(NULL, adr, jmp);
+#elif defined(_TARGET_MIPS64_)
+////FIXME for MIPS.
+#pragma  message("Unimplemented yet MIPS64")
+                    assert(!"unimplemented yet on MIPS");
 #else
 #error Unsupported or unset target architecture
 #endif
@@ -5147,6 +5383,10 @@ unsigned emitter::emitEndCodeGen(Compiler* comp,
 #elif defined(_TARGET_ARMARCH_)
                     assert(!jmp->idAddr()->iiaHasInstrCount());
                     emitOutputLJ(NULL, adr, jmp);
+#elif defined(_TARGET_MIPS64_)
+////FIXME for MIPS.
+#pragma  message("Unimplemented yet MIPS64")
+                    assert(!"unimplemented yet on MIPS");
 #else
 #error Unsupported or unset target architecture
 #endif
@@ -5167,7 +5407,9 @@ unsigned emitter::emitEndCodeGen(Compiler* comp,
     }
 #endif
 
+#ifndef _TARGET_MIPS64_
     unsigned actualCodeSize = emitCurCodeOffs(cp);
+#endif
 
 #if EMITTER_STATS
     totAllocdSize += emitTotalCodeSize;
@@ -5209,6 +5451,7 @@ unsigned emitter::emitEndCodeGen(Compiler* comp,
 
 #endif // DEBUG
 
+    /* FIXME for MIPS: should confirm. */
     // Assign the real prolog size
     *prologSize = emitCodeOffset(emitPrologIG, emitPrologEndPos);
 
@@ -5246,6 +5489,7 @@ void emitter::emitGenGCInfoIfFuncletRetTarget(insGroup* ig, BYTE* cp)
  *  instruction number for this instruction
  */
 
+#if !defined(_TARGET_MIPS64_)
 unsigned emitter::emitFindInsNum(insGroup* ig, instrDesc* idMatch)
 {
     instrDesc* id = (instrDesc*)ig->igData;
@@ -5274,6 +5518,12 @@ unsigned emitter::emitFindInsNum(insGroup* ig, instrDesc* idMatch)
     assert(!"emitFindInsNum failed");
     return -1;
 }
+#else
+unsigned emitter::emitFindInsNum(insGroup* ig, instrDesc* idMatch)
+{
+    assert(!"unimplemented yet on MIPS");
+}
+#endif
 
 /*****************************************************************************
  *
@@ -6945,6 +7195,10 @@ void emitter::emitInitIG(insGroup* ig)
     ig->igSize   = 0;
     ig->igGCregs = RBM_NONE;
     ig->igInsCnt = 0;
+//#ifdef _TARGET_MIPS64_
+// On future maybe use this.
+//    ig->igJmpCnt = emitCurIG->igJmpCnt;
+//#endif
 }
 
 /*****************************************************************************
@@ -6957,6 +7211,10 @@ void emitter::emitInsertIGAfter(insGroup* insertAfterIG, insGroup* ig)
     assert(emitIGlist);
     assert(emitIGlast);
 
+//#ifdef _TARGET_MIPS64_
+// On future maybe use this.
+//    ig->igJmpCnt          = insertAfterIG->igJmpCnt;
+//#endif
     ig->igNext            = insertAfterIG->igNext;
     insertAfterIG->igNext = ig;
 
@@ -7677,7 +7935,7 @@ regMaskTP emitter::emitGetGCRegsKilledByNoGCCall(CorInfoHelpFunc helper)
             // This uses and defs RDI and RSI.
             result = RBM_CALLEE_TRASH_NOGC & ~(RBM_RDI | RBM_RSI);
             break;
-#elif defined(_TARGET_ARMARCH_)
+#elif defined(_TARGET_ARMARCH_) || defined(_TARGET_MIPS64_)
             result = RBM_CALLEE_GCTRASH_WRITEBARRIER_BYREF;
             break;
 #else
@@ -7699,7 +7957,7 @@ regMaskTP emitter::emitGetGCRegsKilledByNoGCCall(CorInfoHelpFunc helper)
 #endif // defined(_TARGET_XARCH_)
 #endif // defined(_TARGET_XARCH_) || defined(_TARGET_ARM_)
 
-#if defined(_TARGET_ARMARCH_)
+#if defined(_TARGET_ARMARCH_) || defined(_TARGET_MIPS64_)
         case CORINFO_HELP_ASSIGN_REF:
         case CORINFO_HELP_CHECKED_ASSIGN_REF:
             result = RBM_CALLEE_GCTRASH_WRITEBARRIER;

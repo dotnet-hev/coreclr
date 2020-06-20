@@ -112,6 +112,20 @@
 #define NOT_ARM64_ARG(x)    , x
 #endif
 
+#ifdef _TARGET_MIPS64_
+#define MIPS64_FIRST_ARG(x)  x ,
+#define MIPS64_ARG(x)        , x
+#define MIPS64_ONLY(x)       x
+#define NOT_MIPS64(x)
+#define NOT_MIPS64_ARG(x)
+#else
+#define MIPS64_FIRST_ARG(x)
+#define MIPS64_ARG(x)
+#define MIPS64_ONLY(x)
+#define NOT_MIPS64(x)        x
+#define NOT_MIPS64_ARG(x)    , x
+#endif
+
 #ifdef _TARGET_64BIT_
 #define LOG2_PTRSIZE 3
 #else
@@ -136,6 +150,9 @@
     #define ALIGN_ACCESS        ((1<<LOG2_PTRSIZE)-1)
 #endif
 
+#ifdef _TARGET_MIPS64_
+    #define ALIGN_ACCESS        4
+#endif
 
 #ifndef ALLOC_ALIGN_CONSTANT
 #define ALLOC_ALIGN_CONSTANT (sizeof(void*)-1)

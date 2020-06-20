@@ -2325,6 +2325,8 @@ void stomp_write_barrier_resize(bool is_runtime_suspended, bool requires_upper_b
 
 void stomp_write_barrier_ephemeral(uint8_t* ephemeral_low, uint8_t* ephemeral_high)
 {
+    initGCShadow();
+
     WriteBarrierParameters args = {};
     args.operation = WriteBarrierOp::StompEphemeral;
     args.is_runtime_suspended = true;
@@ -5063,6 +5065,14 @@ extern "C" uint64_t __rdtsc();
 #else // _MSC_VER
     extern "C" ptrdiff_t get_cycle_count(void);
 #endif // _MSC_VER
+#elif defined(_TARGET_MIPS64_)
+    static ptrdiff_t get_cycle_count()
+    {
+        ////FIXME for MIPS:
+        //ptrdiff_t  cycle;
+        __asm__ volatile ("break \n");
+        return 0;
+    }
 #else
     static ptrdiff_t get_cycle_count()
     {
@@ -36331,11 +36341,6 @@ bool gc_heap::is_pm_ratio_exceeded()
 
 void gc_heap::do_post_gc()
 {
-    if (!settings.concurrent)
-    {
-        initGCShadow();
-    }
-
 #ifdef TRACE_GC
 #ifdef COUNT_CYCLES
     AllocStart = GetCycleCount32();
