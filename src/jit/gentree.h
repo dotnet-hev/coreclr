@@ -339,8 +339,7 @@ struct GenTree
     GenTree##fn& As##fn##Ref()                                                                                         \
     {                                                                                                                  \
         return *As##fn();                                                                                              \
-    }                                                                                                                  \
-    __declspec(property(get = As##fn##Ref)) GenTree##fn& gt##fn;
+    }
 
 #define GTSTRUCT_N(fn, ...)                                                                                            \
     GenTree##fn* As##fn()                                                                                              \
@@ -356,8 +355,7 @@ struct GenTree
     GenTree##fn& As##fn##Ref()                                                                                         \
     {                                                                                                                  \
         return *As##fn();                                                                                              \
-    }                                                                                                                  \
-    __declspec(property(get = As##fn##Ref)) GenTree##fn& gt##fn;
+    }
 
 #define GTSTRUCT_1(fn, en) GTSTRUCT_N(fn, en)
 #define GTSTRUCT_2(fn, en, en2) GTSTRUCT_N(fn, en, en2)
@@ -442,10 +440,6 @@ public:
 #define MAX_COST UCHAR_MAX
 #define IND_COST_EX 3 // execution cost for an indirection
 
-    __declspec(property(get = GetCostEx)) unsigned char gtCostEx; // estimate of expression execution cost
-
-    __declspec(property(get = GetCostSz)) unsigned char gtCostSz; // estimate of expression code size cost
-
     unsigned char GetCostEx() const
     {
         assert(gtCostsInitialized);
@@ -477,8 +471,8 @@ public:
     {
         // If the 'tree' costs aren't initialized, we'll hit an assert below.
         INDEBUG(gtCostsInitialized = tree->gtCostsInitialized;)
-        _gtCostEx = tree->gtCostEx;
-        _gtCostSz = tree->gtCostSz;
+        _gtCostEx = tree->GetCostEx();
+        _gtCostSz = tree->GetCostSz();
     }
 
     // Same as CopyCosts, but avoids asserts if the costs we are copying have not been initialized.
@@ -527,8 +521,6 @@ private:
 public:
     // The register number is stored in a small format (8 bits), but the getters return and the setters take
     // a full-size (unsigned) format, to localize the casts here.
-
-    __declspec(property(get = GetRegNum, put = SetRegNum)) regNumber gtRegNum;
 
     bool canBeContained() const;
 
@@ -1914,7 +1906,7 @@ public:
     bool DefinesLocalAddr(Compiler* comp, unsigned width, GenTreeLclVarCommon** pLclVarTree, bool* pIsEntire);
 
     // These are only used for dumping.
-    // The gtRegNum is only valid in LIR, but the dumping methods are not easily
+    // The GetRegNum() is only valid in LIR, but the dumping methods are not easily
     // modified to check this.
     CLANG_FORMAT_COMMENT_ANCHOR;
 
@@ -1925,7 +1917,7 @@ public:
     }
     regNumber GetReg() const
     {
-        return (GetRegTag() != GT_REGTAG_NONE) ? gtRegNum : REG_NA;
+        return (GetRegTag() != GT_REGTAG_NONE) ? GetRegNum() : REG_NA;
     }
 #endif
 
@@ -2341,7 +2333,7 @@ public:
 // used as a base class.  For unary operators, we instantiate GenTreeOp, with a NULL second
 // argument.  We check that this is true dynamically.  We could tighten this and get static
 // checking, but that would entail accessing the first child of a unary operator via something
-// like gtUnOp.gtOp1 instead of gtOp.gtOp1.
+// like gtUnOp.gtOp1 instead of AsOp()->gtOp1.
 struct GenTreeUnOp : public GenTree
 {
     GenTree* gtOp1;
@@ -2475,8 +2467,8 @@ struct GenTreeIntConCommon : public GenTree
 // node representing a read from a physical register
 struct GenTreePhysReg : public GenTree
 {
-    // physregs need a field beyond gtRegNum because
-    // gtRegNum indicates the destination (and can be changed)
+    // physregs need a field beyond GetRegNum() because
+    // GetRegNum() indicates the destination (and can be changed)
     // whereas reg indicates the source
     regNumber gtSrcReg;
     GenTreePhysReg(regNumber r, var_types type = TYP_I_IMPL) : GenTree(GT_PHYSREG, type), gtSrcReg(r)
@@ -2692,7 +2684,6 @@ public:
     {
         return _gtLclNum;
     }
-    __declspec(property(get = GetLclNum)) unsigned gtLclNum;
 
     void SetLclNum(unsigned lclNum)
     {
@@ -2704,7 +2695,6 @@ public:
     {
         return _gtSsaNum;
     }
-    __declspec(property(get = GetSsaNum)) unsigned gtSsaNum;
 
     void SetSsaNum(unsigned ssaNum)
     {
@@ -2713,7 +2703,7 @@ public:
 
     bool HasSsaName()
     {
-        return (gtSsaNum != SsaConfig::RESERVED_SSA_NUM);
+        return (GetSsaNum() != SsaConfig::RESERVED_SSA_NUM);
     }
 
 #if DEBUGGABLE_GENTREE
@@ -3174,7 +3164,7 @@ struct GenTreeCall final : public GenTree
     // TODO-AllArch: enable for all call nodes to unify single-reg and multi-reg returns.
     ReturnTypeDesc gtReturnTypeDesc;
 
-    // gtRegNum would always be the first return reg.
+    // GetRegNum() would always be the first return reg.
     // The following array holds the other reg numbers of multi-reg return.
     regNumberSmall gtOtherRegs[MAX_RET_REG_COUNT - 1];
 
@@ -3228,7 +3218,7 @@ struct GenTreeCall final : public GenTree
 
         if (idx == 0)
         {
-            return gtRegNum;
+            return GetRegNum();
         }
 
 #if FEATURE_MULTIREG_RET
@@ -3254,7 +3244,7 @@ struct GenTreeCall final : public GenTree
 
         if (idx == 0)
         {
-            gtRegNum = reg;
+            SetRegNum(reg);
         }
 #if FEATURE_MULTIREG_RET
         else
@@ -3815,7 +3805,7 @@ struct GenTreeMultiRegOp : public GenTreeOp
 
     unsigned GetRegCount() const
     {
-        if (gtRegNum == REG_NA || gtRegNum == REG_STK)
+        if (GetRegNum() == REG_NA || GetRegNum() == REG_STK)
         {
             return 0;
         }
@@ -3837,7 +3827,7 @@ struct GenTreeMultiRegOp : public GenTreeOp
 
         if (idx == 0)
         {
-            return gtRegNum;
+            return GetRegNum();
         }
 
         return gtOtherReg;
@@ -4284,7 +4274,7 @@ struct GenTreeBoundsChk : public GenTree
     {
         if (gtArrLen->OperGet() == GT_ARR_LENGTH)
         {
-            return gtArrLen->gtArrLen.ArrRef();
+            return gtArrLen->AsArrLen()->ArrRef();
         }
         else
         {
@@ -4661,7 +4651,6 @@ struct GenTreeObj : public GenTreeBlk
 
     // If non-zero, this is the number of slots in the class layout that
     // contain gc-pointers.
-    __declspec(property(get = GetGcPtrCount)) unsigned gtGcPtrCount;
     unsigned GetGcPtrCount() const
     {
         assert(_gtGcPtrCount != UINT32_MAX);
@@ -4682,7 +4671,7 @@ struct GenTreeObj : public GenTreeBlk
         gtGcPtrs      = gcPtrs;
         _gtGcPtrCount = gcPtrCount;
         gtSlots       = slots;
-        if (gtGcPtrCount != 0)
+        if (GetGcPtrCount() != 0)
         {
             // We assume that we cannot have a struct with GC pointers that is not a multiple
             // of the register size.
@@ -4710,7 +4699,7 @@ struct GenTreeObj : public GenTreeBlk
         if (srcObj->IsGCInfoInitialized())
         {
             gtGcPtrs      = srcObj->gtGcPtrs;
-            _gtGcPtrCount = srcObj->gtGcPtrCount;
+            _gtGcPtrCount = srcObj->GetGcPtrCount();
             gtSlots       = srcObj->gtSlots;
         }
     }
@@ -4898,11 +4887,7 @@ struct GenTreeStmt : public GenTree
     IL_OFFSET gtStmtLastILoffs; // instr offset at end of stmt
 #endif
 
-    __declspec(property(get = getNextStmt)) GenTreeStmt* gtNextStmt;
-
-    __declspec(property(get = getPrevStmt)) GenTreeStmt* gtPrevStmt;
-
-    GenTreeStmt* getNextStmt()
+    GenTreeStmt* GetNextStmt()
     {
         if (gtNext == nullptr)
         {
@@ -4914,7 +4899,7 @@ struct GenTreeStmt : public GenTree
         }
     }
 
-    GenTreeStmt* getPrevStmt()
+    GenTreeStmt* GetPrevStmt()
     {
         if (gtPrev == nullptr)
         {
@@ -5192,7 +5177,7 @@ struct GenTreePutArgSplit : public GenTreePutArgStk
     // Type required to support multi-reg struct arg.
     var_types m_regType[MAX_REG_ARG];
 
-    // First reg of struct is always given by gtRegNum.
+    // First reg of struct is always given by GetRegNum().
     // gtOtherRegs holds the other reg numbers of struct.
     regNumberSmall gtOtherRegs[MAX_REG_ARG - 1];
 
@@ -5219,7 +5204,7 @@ struct GenTreePutArgSplit : public GenTreePutArgStk
 
         if (idx == 0)
         {
-            return gtRegNum;
+            return GetRegNum();
         }
 
         return (regNumber)gtOtherRegs[idx - 1];
@@ -5240,7 +5225,7 @@ struct GenTreePutArgSplit : public GenTreePutArgStk
         assert(idx < MAX_REG_ARG);
         if (idx == 0)
         {
-            gtRegNum = reg;
+            SetRegNum(reg);
         }
         else
         {
@@ -5381,7 +5366,7 @@ struct GenTreeCopyOrReload : public GenTreeUnOp
 {
 #if FEATURE_MULTIREG_RET
     // State required to support copy/reload of a multi-reg call node.
-    // The first register is always given by gtRegNum.
+    // The first register is always given by GetRegNum().
     //
     regNumberSmall gtOtherRegs[MAX_RET_REG_COUNT - 1];
 #endif
@@ -5420,7 +5405,7 @@ struct GenTreeCopyOrReload : public GenTreeUnOp
 
         if (idx == 0)
         {
-            return gtRegNum;
+            return GetRegNum();
         }
 
 #if FEATURE_MULTIREG_RET
@@ -5446,7 +5431,7 @@ struct GenTreeCopyOrReload : public GenTreeUnOp
 
         if (idx == 0)
         {
-            gtRegNum = reg;
+            SetRegNum(reg);
         }
 #if FEATURE_MULTIREG_RET
         else
@@ -5490,8 +5475,8 @@ struct GenTreeCopyOrReload : public GenTreeUnOp
     {
 #if FEATURE_MULTIREG_RET
         // We need to return the highest index for which we have a valid register.
-        // Note that the gtOtherRegs array is off by one (the 0th register is gtRegNum).
-        // If there's no valid register in gtOtherRegs, gtRegNum must be valid.
+        // Note that the gtOtherRegs array is off by one (the 0th register is GetRegNum()).
+        // If there's no valid register in gtOtherRegs, GetRegNum() must be valid.
         // Note that for most nodes, the set of valid registers must be contiguous,
         // but for COPY or RELOAD there is only a valid register for the register positions
         // that must be copied or reloaded.
@@ -5505,13 +5490,13 @@ struct GenTreeCopyOrReload : public GenTreeUnOp
         }
 #endif
         // We should never have a COPY or RELOAD with no valid registers.
-        assert(gtRegNum != REG_NA);
+        assert(GetRegNum() != REG_NA);
         return 1;
     }
 
     GenTreeCopyOrReload(genTreeOps oper, var_types type, GenTree* op1) : GenTreeUnOp(oper, type, op1)
     {
-        gtRegNum = REG_NA;
+        SetRegNum(REG_NA);
         ClearOtherRegs();
     }
 
@@ -5864,7 +5849,7 @@ struct GenTreeCC final : public GenTree
 
 inline bool GenTree::OperIsBlkOp()
 {
-    return ((gtOper == GT_ASG) && varTypeIsStruct(gtOp.gtOp1)) || (OperIsBlk() && (AsBlk()->Data() != nullptr));
+    return ((gtOper == GT_ASG) && varTypeIsStruct(AsOp()->gtOp1)) || (OperIsBlk() && (AsBlk()->Data() != nullptr));
 }
 
 inline bool GenTree::OperIsDynBlkOp()
@@ -5911,7 +5896,7 @@ inline bool GenTree::OperIsCopyBlkOp()
 
 inline bool GenTree::IsFPZero()
 {
-    if ((gtOper == GT_CNS_DBL) && (gtDblCon.gtDconVal == 0.0))
+    if ((gtOper == GT_CNS_DBL) && (AsDblCon()->gtDconVal == 0.0))
     {
         return true;
     }
@@ -5935,12 +5920,12 @@ inline bool GenTree::IsFPZero()
 inline bool GenTree::IsIntegralConst(ssize_t constVal)
 
 {
-    if ((gtOper == GT_CNS_INT) && (gtIntConCommon.IconValue() == constVal))
+    if ((gtOper == GT_CNS_INT) && (AsIntConCommon()->IconValue() == constVal))
     {
         return true;
     }
 
-    if ((gtOper == GT_CNS_LNG) && (gtIntConCommon.LngValue() == constVal))
+    if ((gtOper == GT_CNS_LNG) && (AsIntConCommon()->LngValue() == constVal))
     {
         return true;
     }
@@ -5963,9 +5948,9 @@ inline bool GenTree::IsIntegralConstVector(ssize_t constVal)
 #ifdef FEATURE_SIMD
     // SIMDIntrinsicInit intrinsic with a const value as initializer
     // represents a const vector.
-    if ((gtOper == GT_SIMD) && (gtSIMD.gtSIMDIntrinsicID == SIMDIntrinsicInit) && gtGetOp1()->IsIntegralConst(constVal))
+    if ((gtOper == GT_SIMD) && (AsSIMD()->gtSIMDIntrinsicID == SIMDIntrinsicInit) && gtGetOp1()->IsIntegralConst(constVal))
     {
-        assert(varTypeIsIntegral(gtSIMD.gtSIMDBaseType));
+        assert(varTypeIsIntegral(AsSIMD()->gtSIMDBaseType));
         assert(gtGetOp2IfPresent() == nullptr);
         return true;
     }
@@ -5976,7 +5961,7 @@ inline bool GenTree::IsIntegralConstVector(ssize_t constVal)
 
 inline bool GenTree::IsBoxedValue()
 {
-    assert(gtOper != GT_BOX || gtBox.BoxOp() != nullptr);
+    assert(gtOper != GT_BOX || AsBox()->BoxOp() != nullptr);
     return (gtOper == GT_BOX) && (gtFlags & GTF_BOX_VALUE);
 }
 
@@ -5996,7 +5981,7 @@ inline bool GenTree::IsSIMDEqualityOrInequality() const
 inline GenTree* GenTree::MoveNext()
 {
     assert(OperIsAnyList());
-    return gtOp.gtOp2;
+    return AsOp()->gtOp2;
 }
 
 #ifdef DEBUG
@@ -6051,13 +6036,13 @@ inline bool GenTree::IsValidCallArgument()
 inline GenTree* GenTree::Current()
 {
     assert(OperIsAnyList());
-    return gtOp.gtOp1;
+    return AsOp()->gtOp1;
 }
 
 inline GenTree** GenTree::pCurrent()
 {
     assert(OperIsAnyList());
-    return &(gtOp.gtOp1);
+    return &(AsOp()->gtOp1);
 }
 
 inline GenTree* GenTree::gtGetOp1() const
@@ -6119,11 +6104,11 @@ inline GenTree* GenTree::gtGetOp2() const
 
 inline GenTree* GenTree::gtGetOp2IfPresent() const
 {
-    /* gtOp.gtOp2 is only valid for GTK_BINOP nodes. */
+    /* AsOp()->gtOp2 is only valid for GTK_BINOP nodes. */
 
     GenTree* op2 = OperIsBinary() ? AsOp()->gtOp2 : nullptr;
 
-    // This documents the genTreeOps for which gtOp.gtOp2 cannot be nullptr.
+    // This documents the genTreeOps for which AsOp()->gtOp2 cannot be nullptr.
     // This helps prefix in its analysis of code which calls gtGetOp2()
 
     assert((op2 != nullptr) || !RequiresNonNullOp2(gtOper));
@@ -6138,11 +6123,11 @@ inline GenTree* GenTree::gtEffectiveVal(bool commaOnly)
     {
         if (effectiveVal->gtOper == GT_COMMA)
         {
-            effectiveVal = effectiveVal->gtOp.gtOp2;
+            effectiveVal = effectiveVal->AsOp()->gtOp2;
         }
-        else if (!commaOnly && (effectiveVal->gtOper == GT_NOP) && (effectiveVal->gtOp.gtOp1 != nullptr))
+        else if (!commaOnly && (effectiveVal->gtOper == GT_NOP) && (effectiveVal->AsOp()->gtOp1 != nullptr))
         {
-            effectiveVal = effectiveVal->gtOp.gtOp1;
+            effectiveVal = effectiveVal->AsOp()->gtOp1;
         }
         else
         {
@@ -6169,7 +6154,7 @@ inline GenTree* GenTree::gtRetExprVal()
     {
         if (retExprVal->gtOper == GT_RET_EXPR)
         {
-            retExprVal = retExprVal->gtRetExpr.gtInlineCandidate;
+            retExprVal = retExprVal->AsRetExpr()->gtInlineCandidate;
         }
         else
         {
@@ -6316,7 +6301,7 @@ inline regNumber GenTree::GetRegByIndex(int regIndex)
 {
     if (regIndex == 0)
     {
-        return gtRegNum;
+        return GetRegNum();
     }
 
 #if FEATURE_MULTIREG_RET
@@ -6458,7 +6443,7 @@ inline bool GenTree::IsCnsNonZeroFltOrDbl()
 {
     if (OperGet() == GT_CNS_DBL)
     {
-        double constValue = gtDblCon.gtDconVal;
+        double constValue = AsDblCon()->gtDconVal;
         return *(__int64*)&constValue != 0;
     }
 
@@ -6467,16 +6452,16 @@ inline bool GenTree::IsCnsNonZeroFltOrDbl()
 
 inline bool GenTree::IsHelperCall()
 {
-    return OperGet() == GT_CALL && gtCall.gtCallType == CT_HELPER;
+    return OperGet() == GT_CALL && AsCall()->gtCallType == CT_HELPER;
 }
 
 inline var_types GenTree::CastFromType()
 {
-    return this->gtCast.CastOp()->TypeGet();
+    return this->AsCast()->CastOp()->TypeGet();
 }
 inline var_types& GenTree::CastToType()
 {
-    return this->gtCast.gtCastType;
+    return this->AsCast()->gtCastType;
 }
 
 //-----------------------------------------------------------------------------------
@@ -6495,7 +6480,7 @@ inline bool GenTreeBlk::HasGCPtr()
 {
     if ((gtOper == GT_OBJ) || (gtOper == GT_STORE_OBJ))
     {
-        return (AsObj()->gtGcPtrCount != 0);
+        return (AsObj()->GetGcPtrCount() != 0);
     }
     return false;
 }

@@ -611,7 +611,7 @@ void* BasicBlock::MemoryPhiArg::operator new(size_t sz, Compiler* comp)
 bool BasicBlock::CloneBlockState(
     Compiler* compiler, BasicBlock* to, const BasicBlock* from, unsigned varNum, int varVal)
 {
-    assert(to->bbTreeList == nullptr);
+    assert(to->GetBBTreeList() == nullptr);
 
     to->bbFlags  = from->bbFlags;
     to->bbWeight = from->bbWeight;
@@ -631,7 +631,7 @@ bool BasicBlock::CloneBlockState(
     to->bbTgtStkDepth = from->bbTgtStkDepth;
 #endif // DEBUG
 
-    for (GenTreeStmt* fromStmt = from->firstStmt(); fromStmt != nullptr; fromStmt = fromStmt->getNextStmt())
+    for (GenTreeStmt* fromStmt = from->firstStmt(); fromStmt != nullptr; fromStmt = fromStmt->GetNextStmt())
     {
         auto newExpr = compiler->gtCloneExpr(fromStmt->gtStmtExpr, 0, varNum, varVal);
         if (!newExpr)
@@ -661,7 +661,7 @@ void BasicBlock::MakeLIR(GenTree* firstNode, GenTree* lastNode)
 bool BasicBlock::IsLIR()
 {
     const bool isLIR = (bbFlags & BBF_IS_LIR) != 0;
-    assert((bbTreeList == nullptr) || ((isLIR) == !bbTreeList->IsStatement()));
+    assert((GetBBTreeList() == nullptr) || ((isLIR) == !GetBBTreeList()->IsStatement()));
     return isLIR;
 }
 
@@ -672,16 +672,16 @@ bool BasicBlock::IsLIR()
 //    None.
 //
 // Return Value:
-//    The first statement in the block's bbTreeList.
+//    The first statement in the block's GetBBTreeList().
 //
 GenTreeStmt* BasicBlock::firstStmt() const
 {
-    if (bbTreeList == nullptr)
+    if (GetBBTreeList() == nullptr)
     {
         return nullptr;
     }
 
-    return bbTreeList->AsStmt();
+    return GetBBTreeList()->AsStmt();
 }
 
 //------------------------------------------------------------------------
@@ -691,16 +691,16 @@ GenTreeStmt* BasicBlock::firstStmt() const
 //    None.
 //
 // Return Value:
-//    The last statement in the block's bbTreeList.
+//    The last statement in the block's GetBBTreeList().
 //
 GenTreeStmt* BasicBlock::lastStmt() const
 {
-    if (bbTreeList == nullptr)
+    if (GetBBTreeList() == nullptr)
     {
         return nullptr;
     }
 
-    GenTree* result = bbTreeList->gtPrev;
+    GenTree* result = GetBBTreeList()->gtPrev;
     assert(result && result->gtNext == nullptr);
     return result->AsStmt();
 }
@@ -710,7 +710,7 @@ GenTreeStmt* BasicBlock::lastStmt() const
 //
 GenTree* BasicBlock::firstNode()
 {
-    return IsLIR() ? bbTreeList : Compiler::fgGetFirstNode(firstStmt()->gtStmtExpr);
+    return IsLIR() ? GetBBTreeList() : Compiler::fgGetFirstNode(firstStmt()->gtStmtExpr);
 }
 
 //------------------------------------------------------------------------
@@ -815,10 +815,10 @@ GenTreeStmt* BasicBlock::FirstNonPhiDef()
         return nullptr;
     }
     GenTree* tree = stmt->gtStmtExpr;
-    while ((tree->OperGet() == GT_ASG && tree->gtOp.gtOp2->OperGet() == GT_PHI) ||
-           (tree->OperGet() == GT_STORE_LCL_VAR && tree->gtOp.gtOp1->OperGet() == GT_PHI))
+    while ((tree->OperGet() == GT_ASG && tree->AsOp()->gtOp2->OperGet() == GT_PHI) ||
+           (tree->OperGet() == GT_STORE_LCL_VAR && tree->AsOp()->gtOp1->OperGet() == GT_PHI))
     {
-        stmt = stmt->getNextStmt();
+        stmt = stmt->GetNextStmt();
         if (stmt == nullptr)
         {
             return nullptr;
@@ -836,10 +836,10 @@ GenTreeStmt* BasicBlock::FirstNonPhiDefOrCatchArgAsg()
         return nullptr;
     }
     GenTree* tree = stmt->gtStmtExpr;
-    if ((tree->OperGet() == GT_ASG && tree->gtOp.gtOp2->OperGet() == GT_CATCH_ARG) ||
-        (tree->OperGet() == GT_STORE_LCL_VAR && tree->gtOp.gtOp1->OperGet() == GT_CATCH_ARG))
+    if ((tree->OperGet() == GT_ASG && tree->AsOp()->gtOp2->OperGet() == GT_CATCH_ARG) ||
+        (tree->OperGet() == GT_STORE_LCL_VAR && tree->AsOp()->gtOp1->OperGet() == GT_CATCH_ARG))
     {
-        stmt = stmt->getNextStmt();
+        stmt = stmt->GetNextStmt();
     }
     return stmt;
 }

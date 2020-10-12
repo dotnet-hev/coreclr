@@ -519,11 +519,11 @@ public:
     {
         if (slotNum == 0)
         {
-            return lvArgReg;
+            return GetArgReg();
         }
         else if (slotNum == 1)
         {
-            return lvOtherArgReg;
+            return GetOtherArgReg();
         }
         else
         {
@@ -626,8 +626,6 @@ public:
 
     /////////////////////
 
-    __declspec(property(get = GetRegNum, put = SetRegNum)) regNumber lvRegNum;
-
     regNumber GetRegNum() const
     {
         return (regNumber)_lvRegNum;
@@ -642,8 +640,6 @@ public:
 /////////////////////
 
 #if defined(_TARGET_64BIT_)
-    __declspec(property(get = GetOtherReg, put = SetOtherReg)) regNumber lvOtherReg;
-
     regNumber GetOtherReg() const
     {
         assert(!"shouldn't get here"); // can't use "unreached();" because it's NORETURN, which causes C4072
@@ -657,8 +653,6 @@ public:
                                        // "unreachable code" warnings
     }
 #else  // !_TARGET_64BIT_
-    __declspec(property(get = GetOtherReg, put = SetOtherReg)) regNumber lvOtherReg;
-
     regNumber GetOtherReg() const
     {
         return (regNumber)_lvOtherReg;
@@ -673,8 +667,6 @@ public:
 
     /////////////////////
 
-    __declspec(property(get = GetArgReg, put = SetArgReg)) regNumber lvArgReg;
-
     regNumber GetArgReg() const
     {
         return (regNumber)_lvArgReg;
@@ -687,8 +679,6 @@ public:
     }
 
 #if FEATURE_MULTIREG_ARGS
-    __declspec(property(get = GetOtherArgReg, put = SetOtherArgReg)) regNumber lvOtherArgReg;
-
     regNumber GetOtherArgReg() const
     {
         return (regNumber)_lvOtherArgReg;
@@ -727,8 +717,6 @@ public:
 
     /////////////////////
 
-    __declspec(property(get = GetArgInitReg, put = SetArgInitReg)) regNumber lvArgInitReg;
-
     regNumber GetArgInitReg() const
     {
         return (regNumber)_lvArgInitReg;
@@ -749,7 +737,7 @@ public:
 
     bool lvIsInReg() const
     {
-        return lvIsRegCandidate() && (lvRegNum != REG_STK);
+        return lvIsRegCandidate() && (GetRegNum() != REG_STK);
     }
 
     regMaskTP lvRegMask() const
@@ -757,16 +745,16 @@ public:
         regMaskTP regMask = RBM_NONE;
         if (varTypeIsFloating(TypeGet()))
         {
-            if (lvRegNum != REG_STK)
+            if (GetRegNum() != REG_STK)
             {
-                regMask = genRegMaskFloat(lvRegNum, TypeGet());
+                regMask = genRegMaskFloat(GetRegNum(), TypeGet());
             }
         }
         else
         {
-            if (lvRegNum != REG_STK)
+            if (GetRegNum() != REG_STK)
             {
-                regMask = genRegMask(lvRegNum);
+                regMask = genRegMask(GetRegNum());
             }
         }
         return regMask;
@@ -927,7 +915,7 @@ public:
 
     void PrintVarReg() const
     {
-        printf("%s", getRegName(lvRegNum));
+        printf("%s", getRegName(GetRegNum()));
     }
 #endif // DEBUG
 
@@ -1365,23 +1353,20 @@ public:
         return isLate;
     }
 
-    __declspec(property(get = getLateArgInx, put = setLateArgInx)) unsigned lateArgInx;
-    unsigned getLateArgInx()
+    unsigned GetLateArgInx()
     {
         assert(isLateArg());
         return _lateArgInx;
     }
-    void setLateArgInx(unsigned inx)
+    void SetLateArgInx(unsigned inx)
     {
         _lateArgInx = inx;
     }
-    __declspec(property(get = getRegNum)) regNumber regNum;
-    regNumber getRegNum()
+    regNumber GetRegNum()
     {
         return (regNumber)regNums[0];
     }
-    __declspec(property(get = getOtherRegNum)) regNumber otherRegNum;
-    regNumber getOtherRegNum()
+    regNumber GetOtherRegNum()
     {
         return (regNumber)regNums[1];
     }
@@ -1401,8 +1386,7 @@ public:
         return (regNumber)regNums[i];
     }
 
-    __declspec(property(get = getIsSplit, put = setIsSplit)) bool isSplit;
-    bool getIsSplit()
+    bool GetIsSplit()
     {
 #ifdef FEATURE_ARG_SPLIT
         return _isSplit;
@@ -1410,15 +1394,14 @@ public:
         return false;
 #endif
     }
-    void setIsSplit(bool value)
+    void SetIsSplit(bool value)
     {
 #ifdef FEATURE_ARG_SPLIT
         _isSplit = value;
 #endif
     }
 
-    __declspec(property(get = getIsVararg, put = setIsVararg)) bool isVararg;
-    bool getIsVararg()
+    bool GetIsVararg()
     {
 #ifdef FEATURE_VARARG
         return _isVararg;
@@ -1426,15 +1409,14 @@ public:
         return false;
 #endif
     }
-    void setIsVararg(bool value)
+    void SetIsVararg(bool value)
     {
 #ifdef FEATURE_VARARG
         _isVararg = value;
 #endif // FEATURE_VARARG
     }
 
-    __declspec(property(get = getIsHfaArg)) bool isHfaArg;
-    bool getIsHfaArg()
+    bool GetIsHfaArg()
     {
 #ifdef FEATURE_HFA
         return IsHfa(_hfaElemKind);
@@ -1443,8 +1425,7 @@ public:
 #endif
     }
 
-    __declspec(property(get = getIsHfaRegArg)) bool isHfaRegArg;
-    bool getIsHfaRegArg()
+    bool GetIsHfaRegArg()
     {
 #ifdef FEATURE_HFA
         return IsHfa(_hfaElemKind) && isPassedInRegisters();
@@ -1453,7 +1434,6 @@ public:
 #endif
     }
 
-    __declspec(property(get = GetHfaType)) var_types hfaType;
     var_types GetHfaType()
     {
 #ifdef FEATURE_HFA
@@ -1484,7 +1464,7 @@ public:
             }
 #endif // _TARGET_ARM_
 
-            if (!isHfaArg)
+            if (!GetIsHfaArg())
             {
                 // We haven't previously set this; do so now.
                 _hfaElemKind = HfaElemKindFromType(type);
@@ -1529,7 +1509,7 @@ public:
 
     bool isPassedInRegisters()
     {
-        return !isSplit && (numRegs != 0);
+        return !GetIsSplit() && (numRegs != 0);
     }
 
     bool isPassedInFloatRegisters()
@@ -1537,13 +1517,13 @@ public:
 #ifdef _TARGET_X86
         return false;
 #else
-        return isValidFloatArgReg(regNum);
+        return isValidFloatArgReg(GetRegNum());
 #endif
     }
 
     bool isSingleRegOrSlot()
     {
-        return !isSplit && ((numRegs == 1) || (numSlots == 1));
+        return !GetIsSplit() && ((numRegs == 1) || (numSlots == 1));
     }
 
     // Returns the number of "slots" used, where for this purpose a
@@ -1555,7 +1535,7 @@ public:
             assert(isPassedInRegisters());
             assert(numRegs == 1);
         }
-        else if (regNum == REG_STK)
+        else if (GetRegNum() == REG_STK)
         {
             assert(!isPassedInRegisters());
             assert(numRegs == 0);
@@ -1573,25 +1553,25 @@ public:
     {
         unsigned size = getSlotCount();
 #ifdef FEATURE_HFA
-        if (isHfaRegArg)
+        if (GetIsHfaRegArg())
         {
 #ifdef _TARGET_ARM_
             // We counted the number of regs, but if they are DOUBLE hfa regs we have to double the size.
-            if (hfaType == TYP_DOUBLE)
+            if (GetHfaType() == TYP_DOUBLE)
             {
-                assert(!isSplit);
+                assert(!GetIsSplit());
                 size <<= 1;
             }
 #elif defined(_TARGET_ARM64_)
             // We counted the number of regs, but if they are FLOAT hfa regs we have to halve the size,
             // or if they are SIMD16 vector hfa regs we have to double the size.
-            if (hfaType == TYP_FLOAT)
+            if (GetHfaType() == TYP_FLOAT)
             {
                 // Round up in case of odd HFA count.
                 size = (size + 1) >> 1;
             }
 #ifdef FEATURE_SIMD
-            else if (hfaType == TYP_SIMD16)
+            else if (GetHfaType() == TYP_SIMD16)
             {
                 size <<= 1;
             }
@@ -1615,7 +1595,7 @@ public:
 
         regNumber argReg = getRegNum(0);
 #ifdef _TARGET_ARM_
-        unsigned int regSize = (hfaType == TYP_DOUBLE) ? 2 : 1;
+        unsigned int regSize = (GetHfaType() == TYP_DOUBLE) ? 2 : 1;
 #else
         unsigned int regSize = 1;
 #endif
@@ -2599,7 +2579,7 @@ public:
 
     // Returns "true" iff the complexity (not formally defined, but first interpretation
     // is #of nodes in subtree) of "tree" is greater than "limit".
-    // (This is somewhat redundant with the "gtCostEx/gtCostSz" fields, but can be used
+    // (This is somewhat redundant with the "GetCostEx()/GetCostSz()" fields, but can be used
     // before they have been set.)
     bool gtComplexityExceeds(GenTree** tree, unsigned limit);
 
@@ -7178,8 +7158,7 @@ public:
     // convenience and backward compatibility, but the properties can only be set by invoking
     // the setter on CodeGenContext directly.
 
-    __declspec(property(get = getEmitter)) emitter* genEmitter;
-    emitter* getEmitter() const
+    emitter* GetEmitter() const
     {
         return codeGen->getEmitter();
     }
@@ -7189,25 +7168,23 @@ public:
         return codeGen->isFramePointerUsed();
     }
 
-    __declspec(property(get = getInterruptible, put = setInterruptible)) bool genInterruptible;
-    bool getInterruptible()
+    bool GetInterruptible()
     {
-        return codeGen->genInterruptible;
+        return codeGen->GetInterruptible();
     }
-    void setInterruptible(bool value)
+    void SetInterruptible(bool value)
     {
-        codeGen->setInterruptible(value);
+        codeGen->SetInterruptible(value);
     }
 
 #ifdef _TARGET_ARMARCH_
-    __declspec(property(get = getHasTailCalls, put = setHasTailCalls)) bool hasTailCalls;
-    bool getHasTailCalls()
+    bool GetHasTailCalls()
     {
-        return codeGen->hasTailCalls;
+        return codeGen->GetHasTailCalls();
     }
-    void setHasTailCalls(bool value)
+    void SetHasTailCalls(bool value)
     {
-        codeGen->setHasTailCalls(value);
+        codeGen->SetHasTailCalls(value);
     }
 #endif // _TARGET_ARMARCH_
 
@@ -7224,14 +7201,13 @@ public:
                            unsigned refCntWtdStkDbl);
 #endif // DOUBLE_ALIGN
 
-    __declspec(property(get = getFullPtrRegMap, put = setFullPtrRegMap)) bool genFullPtrRegMap;
-    bool getFullPtrRegMap()
+    bool IsFullPtrRegMapRequired()
     {
-        return codeGen->genFullPtrRegMap;
+        return codeGen->IsFullPtrRegMapRequired();
     }
-    void setFullPtrRegMap(bool value)
+    void SetFullPtrRegMapRequired(bool value)
     {
-        codeGen->setFullPtrRegMap(value);
+        codeGen->SetFullPtrRegMapRequired(value);
     }
 
 // Things that MAY belong either in CodeGen or CodeGenContext
@@ -7676,7 +7652,7 @@ private:
     // type of an arg node is TYP_BYREF and a local node is TYP_SIMD or TYP_STRUCT.
     bool isSIMDTypeLocal(GenTree* tree)
     {
-        return tree->OperIsLocal() && lvaTable[tree->AsLclVarCommon()->gtLclNum].lvSIMDType;
+        return tree->OperIsLocal() && lvaTable[tree->AsLclVarCommon()->GetLclNum()].lvSIMDType;
     }
 
     // Returns true if the lclVar is an opaque SIMD type.
@@ -7700,7 +7676,7 @@ private:
                     return varTypeIsSIMD(tree->gtGetOp1());
 
                 case GT_LCL_VAR_ADDR:
-                    return lvaTable[tree->AsLclVarCommon()->gtLclNum].lvSIMDType;
+                    return lvaTable[tree->AsLclVarCommon()->GetLclNum()].lvSIMDType;
 
                 default:
                     return isSIMDTypeLocal(tree);
@@ -7723,7 +7699,7 @@ private:
     {
         if (isSIMDTypeLocal(tree))
         {
-            return lvaTable[tree->AsLclVarCommon()->gtLclNum].lvBaseType;
+            return lvaTable[tree->AsLclVarCommon()->GetLclNum()].lvBaseType;
         }
 
         return TYP_UNKNOWN;
@@ -8073,7 +8049,7 @@ private:
     // Is this Local node a SIMD local?
     bool lclVarIsSIMDType(GenTreeLclVarCommon* lclVarTree)
     {
-        return lclVarIsSIMDType(lclVarTree->gtLclNum);
+        return lclVarIsSIMDType(lclVarTree->GetLclNum());
     }
 
     // Returns true if the TYP_SIMD locals on stack are aligned at their

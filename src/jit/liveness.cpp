@@ -25,7 +25,7 @@ void Compiler::fgMarkUseDef(GenTreeLclVarCommon* tree)
 {
     assert((tree->OperIsLocal() && (tree->OperGet() != GT_PHI_ARG)) || tree->OperIsLocalAddr());
 
-    const unsigned lclNum = tree->gtLclNum;
+    const unsigned lclNum = tree->GetLclNum();
     assert(lclNum < lvaCount);
 
     LclVarDsc* const varDsc = &lvaTable[lclNum];
@@ -266,7 +266,7 @@ void Compiler::fgPerNodeLocalVarLiveness(GenTree* tree)
             {
                 GenTreeLclVarCommon* dummyLclVarTree = nullptr;
                 bool                 dummyIsEntire   = false;
-                GenTree*             addrArg         = tree->gtOp.gtOp1->gtEffectiveVal(/*commaOnly*/ true);
+                GenTree*             addrArg         = tree->AsOp()->gtOp1->gtEffectiveVal(/*commaOnly*/ true);
                 if (!addrArg->DefinesLocalAddr(this, /*width doesn't matter*/ 0, &dummyLclVarTree, &dummyIsEntire))
                 {
                     fgCurMemoryUse |= memoryKindSet(GcHeap, ByrefExposed);
@@ -351,7 +351,7 @@ void Compiler::fgPerNodeLocalVarLiveness(GenTree* tree)
             // This ensures that the block->bbVarUse will contain
             // the FrameRoot local var if is it a tracked variable.
 
-            if ((tree->gtCall.IsUnmanaged() || (tree->gtCall.IsTailCall() && info.compCallUnmanaged)))
+            if ((tree->AsCall()->IsUnmanaged() || (tree->AsCall()->IsTailCall() && info.compCallUnmanaged)))
             {
                 assert((!opts.ShouldUsePInvokeHelpers()) || (info.compLvFrameListRoot == BAD_VAR_NUM));
                 if (!opts.ShouldUsePInvokeHelpers())
@@ -382,7 +382,7 @@ void Compiler::fgPerNodeLocalVarLiveness(GenTree* tree)
                 GenTreeLclVarCommon* dummyLclVarTree = nullptr;
                 if (tree->DefinesLocal(this, &dummyLclVarTree))
                 {
-                    if (lvaVarAddrExposed(dummyLclVarTree->gtLclNum))
+                    if (lvaVarAddrExposed(dummyLclVarTree->GetLclNum()))
                     {
                         fgCurMemoryDef |= memoryKindSet(ByrefExposed);
 
@@ -494,7 +494,7 @@ void Compiler::fgPerBlockLocalVarLiveness()
         }
         else
         {
-            for (GenTreeStmt* stmt = block->FirstNonPhiDef(); stmt != nullptr; stmt = stmt->getNextStmt())
+            for (GenTreeStmt* stmt = block->FirstNonPhiDef(); stmt != nullptr; stmt = stmt->GetNextStmt())
             {
                 compCurStmt = stmt;
                 for (GenTree* node = stmt->gtStmtList; node != nullptr; node = node->gtNext)
@@ -1000,7 +1000,7 @@ void Compiler::fgExtendDbgLifetimes()
                 else
                 {
                     GenTree* store    = new (this, GT_STORE_LCL_VAR) GenTreeLclVar(GT_STORE_LCL_VAR, type, varNum);
-                    store->gtOp.gtOp1 = zero;
+                    store->AsOp()->gtOp1 = zero;
                     store->gtFlags |= (GTF_VAR_DEF | GTF_ASG);
 
                     LIR::Range initRange = LIR::EmptyRange();
@@ -1470,7 +1470,7 @@ VARSET_VALRET_TP Compiler::fgUpdateLiveSet(VARSET_VALARG_TP liveSet, GenTree* tr
                 // fgGetHandlerLiveVars(compCurBB), but seems excessive
                 //
                 assert(VarSetOps::IsEmptyIntersection(this, newLiveSet, varBits) || opts.compDbgCode ||
-                       lvaTable[tree->gtLclVarCommon.gtLclNum].lvAddrExposed ||
+                       lvaTable[tree->AsLclVarCommon()->GetLclNum()].lvAddrExposed ||
                        (compCurBB != nullptr && ehBlockHasExnFlowDsc(compCurBB)));
                 VarSetOps::UnionD(this, newLiveSet, varBits);
             }
@@ -1581,7 +1581,7 @@ void Compiler::fgComputeLifeTrackedLocalUse(VARSET_TP& life, LclVarDsc& varDsc, 
 #ifdef DEBUG
     if (verbose && 0)
     {
-        printf("Ref V%02u,T%02u] at ", node->gtLclNum, varIndex);
+        printf("Ref V%02u,T%02u] at ", node->GetLclNum(), varIndex);
         printTreeID(node);
         printf(" life %s -> %s\n", VarSetOps::ToString(this, life),
                VarSetOps::ToString(this, VarSetOps::AddElem(this, life, varIndex)));
@@ -1630,7 +1630,7 @@ bool Compiler::fgComputeLifeTrackedLocalDef(VARSET_TP&           life,
 #ifdef DEBUG
             if (verbose && 0)
             {
-                printf("Def V%02u,T%02u at ", node->gtLclNum, varIndex);
+                printf("Def V%02u,T%02u at ", node->GetLclNum(), varIndex);
                 printTreeID(node);
                 printf(" life %s -> %s\n",
                        VarSetOps::ToString(this,
@@ -1756,7 +1756,7 @@ void Compiler::fgComputeLifeUntrackedLocal(VARSET_TP&           life,
 //    `true` if the local var node corresponds to a dead store; `false` otherwise.
 bool Compiler::fgComputeLifeLocal(VARSET_TP& life, VARSET_VALARG_TP keepAliveVars, GenTree* lclVarNode)
 {
-    unsigned lclNum = lclVarNode->gtLclVarCommon.gtLclNum;
+    unsigned lclNum = lclVarNode->AsLclVarCommon()->GetLclNum();
 
     assert(lclNum < lvaCount);
     LclVarDsc& varDsc = lvaTable[lclNum];
@@ -1817,7 +1817,7 @@ void Compiler::fgComputeLife(VARSET_TP&       life,
             bool isDeadStore = fgComputeLifeLocal(life, keepAliveVars, tree);
             if (isDeadStore)
             {
-                LclVarDsc* varDsc = &lvaTable[tree->gtLclVarCommon.gtLclNum];
+                LclVarDsc* varDsc = &lvaTable[tree->AsLclVarCommon()->GetLclNum()];
 
                 bool doAgain = false;
                 if (fgRemoveDeadStore(&tree, varDsc, life, &doAgain, pStmtInfoDirty DEBUGARG(treeModf)))
@@ -1903,7 +1903,7 @@ void Compiler::fgComputeLifeLIR(VARSET_TP& life, BasicBlock* block, VARSET_VALAR
             case GT_LCL_FLD:
             {
                 GenTreeLclVarCommon* const lclVarNode = node->AsLclVarCommon();
-                LclVarDsc&                 varDsc     = lvaTable[lclVarNode->gtLclNum];
+                LclVarDsc&                 varDsc     = lvaTable[lclVarNode->GetLclNum()];
 
                 if (node->IsUnusedValue())
                 {
@@ -1934,7 +1934,7 @@ void Compiler::fgComputeLifeLIR(VARSET_TP& life, BasicBlock* block, VARSET_VALAR
                     JITDUMP("Removing dead LclVar address:\n");
                     DISPNODE(node);
 
-                    const bool isTracked = lvaTable[node->AsLclVarCommon()->gtLclNum].lvTracked;
+                    const bool isTracked = lvaTable[node->AsLclVarCommon()->GetLclNum()].lvTracked;
                     blockRange.Delete(this, block, node);
                     if (isTracked && !opts.MinOpts())
                     {
@@ -1974,7 +1974,7 @@ void Compiler::fgComputeLifeLIR(VARSET_TP& life, BasicBlock* block, VARSET_VALAR
             {
                 GenTreeLclVarCommon* const lclVarNode = node->AsLclVarCommon();
 
-                LclVarDsc& varDsc = lvaTable[lclVarNode->gtLclNum];
+                LclVarDsc& varDsc = lvaTable[lclVarNode->GetLclNum()];
                 if (varDsc.lvTracked)
                 {
                     isDeadStore = fgComputeLifeTrackedLocalDef(life, keepAliveVars, varDsc, lclVarNode);
@@ -2145,7 +2145,7 @@ bool Compiler::fgRemoveDeadStore(GenTree**        pTree,
     // First, characterize the lclVarTree and see if we are taking its address.
     if (tree->OperIsLocalStore())
     {
-        rhsNode = tree->gtOp.gtOp1;
+        rhsNode = tree->AsOp()->gtOp1;
         asgNode = tree;
     }
     else if (tree->OperIsLocal())
@@ -2315,7 +2315,7 @@ bool Compiler::fgRemoveDeadStore(GenTree**        pTree,
             {
                 JITDUMP("removing stmt with no side effects\n");
 
-                // No side effects - remove the whole statement from the block->bbTreeList
+                // No side effects - remove the whole statement from the block->GetBBTreeList()
                 fgRemoveStmt(compCurBB, compCurStmt);
 
                 // Since we removed it do not process the rest (i.e. RHS) of the statement
@@ -2345,8 +2345,8 @@ bool Compiler::fgRemoveDeadStore(GenTree**        pTree,
 #ifdef DEBUG
                     *treeModf = true;
 #endif // DEBUG
-                    asgNode->gtOp.gtOp1 = sideEffList->gtOp.gtOp1;
-                    asgNode->gtOp.gtOp2 = sideEffList->gtOp.gtOp2;
+                    asgNode->AsOp()->gtOp1 = sideEffList->AsOp()->gtOp1;
+                    asgNode->AsOp()->gtOp2 = sideEffList->AsOp()->gtOp2;
                     asgNode->gtType     = sideEffList->gtType;
                 }
                 else
@@ -2362,13 +2362,13 @@ bool Compiler::fgRemoveDeadStore(GenTree**        pTree,
 
                     if (sideEffList->gtOper == GT_COMMA)
                     {
-                        asgNode->gtOp.gtOp1 = sideEffList->gtOp.gtOp1;
-                        asgNode->gtOp.gtOp2 = sideEffList->gtOp.gtOp2;
+                        asgNode->AsOp()->gtOp1 = sideEffList->AsOp()->gtOp1;
+                        asgNode->AsOp()->gtOp2 = sideEffList->AsOp()->gtOp2;
                     }
                     else
                     {
-                        asgNode->gtOp.gtOp1 = sideEffList;
-                        asgNode->gtOp.gtOp2 = gtNewNothingNode();
+                        asgNode->AsOp()->gtOp1 = sideEffList;
+                        asgNode->AsOp()->gtOp2 = gtNewNothingNode();
                     }
                 }
             }
@@ -2617,7 +2617,7 @@ void Compiler::fgInterBlockLocalVarLiveness()
                 noway_assert(nextStmt != nullptr);
 
                 compCurStmt = nextStmt;
-                nextStmt    = nextStmt->getPrevStmt();
+                nextStmt    = nextStmt->GetPrevStmt();
 
                 /* Compute the liveness for each tree node in the statement */
                 bool stmtInfoDirty = false;

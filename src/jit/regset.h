@@ -99,22 +99,19 @@ public:
     void verifyRegistersUsed(regMaskTP regMask);
 
 public: // TODO-Cleanup: Should be private, but GCInfo uses them
-    __declspec(property(get = GetMaskVars, put = SetMaskVars)) regMaskTP rsMaskVars; // mask of registers currently
-                                                                                     // allocated to variables
-
-    regMaskTP GetMaskVars() const // 'get' property function for rsMaskVars property
+    regMaskTP GetMaskVars() const // 'get' property function for GetMaskVars() property
     {
         return _rsMaskVars;
     }
 
-    void SetMaskVars(regMaskTP newMaskVars); // 'put' property function for rsMaskVars property
+    void SetMaskVars(regMaskTP newMaskVars); // 'put' property function for GetMaskVars() property
 
-    void AddMaskVars(regMaskTP addMaskVars) // union 'addMaskVars' with the rsMaskVars set
+    void AddMaskVars(regMaskTP addMaskVars) // union 'addMaskVars' with the GetMaskVars() set
     {
         SetMaskVars(_rsMaskVars | addMaskVars);
     }
 
-    void RemoveMaskVars(regMaskTP removeMaskVars) // remove 'removeMaskVars' from the rsMaskVars set (like bitset DiffD)
+    void RemoveMaskVars(regMaskTP removeMaskVars) // remove 'removeMaskVars' from the GetMaskVars() set (like bitset DiffD)
     {
         SetMaskVars(_rsMaskVars & ~removeMaskVars);
     }
@@ -125,7 +122,7 @@ public: // TODO-Cleanup: Should be private, but GCInfo uses them
     }
 
 private:
-    regMaskTP _rsMaskVars; // backing store for rsMaskVars property
+    regMaskTP _rsMaskVars; // backing store for GetMaskVars() property
 
 #ifdef _TARGET_ARMARCH_
     regMaskTP rsMaskCalleeSaved; // mask of the registers pushed/popped in the prolog/epilog
