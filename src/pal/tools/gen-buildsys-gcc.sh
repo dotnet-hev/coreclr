@@ -67,10 +67,7 @@ code_coverage=OFF
 generator="Unix Makefiles"
 __UnprocessedCMakeArgs=""
 
-ITER=-1
 for i in "$@"; do
-    ITER=$((ITER + 1))
-    if [ $ITER -lt 6 ]; then continue; fi
     upperI="$(echo "$i" | awk '{print toupper($0)}')"
     case $upperI in
       # Possible build types are DEBUG, CHECKED, RELEASE, RELWITHDEBINFO, MINSIZEREL.
