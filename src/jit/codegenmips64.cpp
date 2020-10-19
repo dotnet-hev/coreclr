@@ -8297,6 +8297,10 @@ void CodeGen::genCodeForIndir(GenTreeIndir* tree)
         }
     }
 
+    if (CLRConfig::GetConfigValue(CLRConfig::UNSUPPORTED_PreventIndirReorder)) {
+        instGen_MemoryBarrier(INS_BARRIER_RMB);
+    }
+
     getEmitter()->emitInsLoadStoreOp(ins, attr, tmpReg, tree);
 
     if (emitBarrier)

@@ -739,6 +739,11 @@ RETAIL_CONFIG_DWORD_INFO(INTERNAL_GDBJitEmitDebugFrame, W("GDBJitEmitDebugFrame"
 #endif
 #endif
 
+//
+// Loongson-specific
+//
+RETAIL_CONFIG_DWORD_INFO(UNSUPPORTED_PreventIndirReorder, W("PreventIndirReorder"), 0, "Prevent indirect memory access reorder.")
+
 ///
 /// Uncategorized
 ///
